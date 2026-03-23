@@ -1,25 +1,28 @@
+#!/usr/bin/env python3
+
 import os
 import csv
 import json
 import imagehash
 import urllib.parse
 
-def get_html_content(photos_json, groups_data_json):
+def get_html_content(photos_json, groups_data_json, total_count):
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>照片清理助手 (效能優化版)</title>
+        <title>照片清理助手</title>
         <style>
             body {{ font-family: -apple-system, sans-serif; background: #f5f5f7; padding: 20px; color: #1d1d1f; margin: 0; }}
-            .nav {{ position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); 
-                    padding: 12px 20px; border-bottom: 1px solid #d2d2d7; z-index: 100; 
+            .nav {{ position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
+                    padding: 12px 20px; border-bottom: 1px solid #d2d2d7; z-index: 100;
                     display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap; }}
             .nav-group {{ display: flex; gap: 10px; align-items: center; border-right: 1px solid #d2d2d7; padding-right: 15px; }}
             .nav-group:last-child {{ border-right: none; }}
             .nav button {{ padding: 6px 14px; border-radius: 20px; border: 1px solid #d2d2d7; background: white; cursor: pointer; font-size: 13px; }}
             .nav button.active {{ background: #007aff; color: white; border-color: #007aff; font-weight: bold; }}
+
             .container {{ max-width: 1400px; margin: 0 auto; padding: 20px; }}
             .grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }}
             .group-wrapper {{ background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid #d2d2d7; }}
@@ -28,10 +31,15 @@ def get_html_content(photos_json, groups_data_json):
             .img-container {{ width: 100%; height: 180px; overflow: hidden; border-radius: 6px; background: #eee; display: flex; align-items: center; justify-content: center; }}
             .img-container img {{ max-width: 100%; max-height: 100%; object-fit: contain; }}
             .info {{ font-size: 10px; margin-top: 8px; word-break: break-all; }}
+
             #float-preview {{ position: fixed; top: 80px; width: 45%; height: calc(100vh - 100px); background: white; border-radius: 12px; box-shadow: 0 15px 50px rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 9999; pointer-events: none; border: 1px solid #ccc; }}
             #float-preview img {{ max-width: 95%; max-height: 95%; object-fit: contain; }}
+
             .controls {{ position: fixed; bottom: 20px; right: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); z-index: 100; width: 220px; }}
-            .btn-del {{ width: 100%; padding: 10px; background: #ff4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }}
+            .stat-item {{ font-size: 12px; margin-bottom: 5px; color: #666; display: flex; justify-content: space-between; }}
+            .stat-item b {{ color: #1d1d1f; }}
+            .btn-del {{ width: 100%; padding: 10px; background: #007aff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; transition: 0.3s; }}
+            .btn-del.copied {{ background: #34c759; }}
             textarea {{ width: 100%; height: 60px; font-family: monospace; font-size: 10px; margin-top: 8px; border: 1px solid #ddd; resize: none; }}
             #sentinel {{ height: 50px; margin-bottom: 100px; display: flex; align-items: center; justify-content: center; color: #888; }}
         </style>
@@ -52,7 +60,6 @@ def get_html_content(photos_json, groups_data_json):
                 <span id="blur-val" style="font-size:12px">80</span>
             </div>
             <div class="nav-group" id="sim-controls" style="display:none;">
-                <span style="font-size:12px">相似等級:</span>
                 <button id="s1" onclick="updateSimValue(1)">極高(1)</button>
                 <button id="s5" onclick="updateSimValue(5)" class="active">高(5)</button>
                 <button id="s10" onclick="updateSimValue(10)">中(10)</button>
@@ -64,10 +71,14 @@ def get_html_content(photos_json, groups_data_json):
             <div id="content-area"></div>
             <div id="sentinel"></div>
         </div>
+
         <div id="float-preview"><img id="preview-img" src=""></div>
+
         <div class="controls">
-            <div id="select-count" style="font-size: 12px; margin-bottom: 8px;">已選取: 0</div>
-            <button class="btn-del" onclick="generateDeleteList()">產生指令</button>
+            <div class="stat-item">目錄總數: <b>{total_count}</b></div>
+            <div class="stat-item">當前模式: <b id="mode-count">0</b></div>
+            <div class="stat-item">已選取: <b id="select-count">0</b></div>
+            <button id="copy-btn" class="btn-del" onclick="generateDeleteList()">產生指令並複製</button>
             <div id="result" style="display:none;"><textarea id="cmdBox" readonly></textarea></div>
         </div>
 
@@ -78,16 +89,16 @@ def get_html_content(photos_json, groups_data_json):
             let filteredList = [], selectedFiles = new Set();
             let blurThreshold = 80, simThreshold = 5;
 
-            function updateBlurValue(v) {{ 
-                blurThreshold = parseInt(v); 
+            function updateBlurValue(v) {{
+                blurThreshold = parseInt(v);
                 document.getElementById('blur-val').innerText = v;
-                if (currentMode === 'blur') setMode('blur'); 
+                if (currentMode === 'blur') setMode('blur');
             }}
-            function updateSimValue(v) {{ 
-                simThreshold = v; 
+            function updateSimValue(v) {{
+                simThreshold = v;
                 document.querySelectorAll('#sim-controls button').forEach(b => b.classList.remove('active'));
                 document.getElementById('s' + v).classList.add('active');
-                if (currentMode === 'sim') setMode('sim'); 
+                if (currentMode === 'sim') setMode('sim');
             }}
 
             function setMode(mode) {{
@@ -100,6 +111,10 @@ def get_html_content(photos_json, groups_data_json):
                 if (mode === 'all') filteredList = allPhotos;
                 else if (mode === 'blur') filteredList = allPhotos.filter(p => p.score < blurThreshold);
                 else filteredList = groupsData[simThreshold] || [];
+
+                document.getElementById('mode-count').innerText = (mode === 'sim')
+                    ? filteredList.reduce((acc, g) => acc + g.length, 0)
+                    : filteredList.length;
 
                 dynamicPageSize = (filteredList.length < 1000) ? filteredList.length + 1 : 50;
                 document.getElementById('sentinel').style.display = (filteredList.length < 1000) ? 'none' : 'flex';
@@ -138,7 +153,7 @@ def get_html_content(photos_json, groups_data_json):
             function toggleSelect(fname) {{
                 if (selectedFiles.has(fname)) selectedFiles.delete(fname); else selectedFiles.add(fname);
                 document.querySelectorAll(`[data-fname="${{fname}}"]`).forEach(el => el.classList.toggle('selected'));
-                document.getElementById('select-count').innerText = `已選取: ${{selectedFiles.size}}`;
+                document.getElementById('select-count').innerText = selectedFiles.size;
             }}
 
             function showPreview(url) {{
@@ -152,11 +167,32 @@ def get_html_content(photos_json, groups_data_json):
                 if (e.clientX < window.innerWidth / 2) {{ p.style.left = 'auto'; p.style.right = '20px'; }}
                 else {{ p.style.right = 'auto'; p.style.left = '20px'; }}
             }}
-            function generateDeleteList() {{
+
+            async function generateDeleteList() {{
                 if (selectedFiles.size === 0) return;
+                const cmd = "rm " + Array.from(selectedFiles).map(f => `"${{f}}"`).join(' ');
+
+                // 寫入文字框
                 document.getElementById('result').style.display = 'block';
-                document.getElementById('cmdBox').value = "rm " + Array.from(selectedFiles).map(f => `"${{f}}"`).join(' ');
+                const cmdBox = document.getElementById('cmdBox');
+                cmdBox.value = cmd;
+
+                // 💡 複製到剪貼簿
+                try {{
+                    await navigator.clipboard.writeText(cmd);
+                    const btn = document.getElementById('copy-btn');
+                    const originalText = btn.innerText;
+                    btn.innerText = "✅ 已複製到剪貼簿！";
+                    btn.classList.add('copied');
+                    setTimeout(() => {{
+                        btn.innerText = originalText;
+                        btn.classList.remove('copied');
+                    }}, 2000);
+                }} catch (err) {{
+                    console.error('無法複製: ', err);
+                }}
             }}
+
             const observer = new IntersectionObserver((entries) => {{ if (entries[0].isIntersecting) loadMore(); }}, {{ threshold: 0.1 }});
             observer.observe(document.getElementById('sentinel'));
             setMode('all');
@@ -180,10 +216,10 @@ def generate_tools(folder_path):
                     'url': f"file://{urllib.parse.quote(abs_p)}"
                 })
 
+    total_files = len(valid_photos)
     photo_objs = [{'d': p, 'h': imagehash.hex_to_hash(p['hash'])} for p in valid_photos]
     groups_data = {}
-    
-    # 只計算 1, 5, 10, 15 四組等級
+
     thresholds = [1, 5, 10, 15]
     for t in thresholds:
         print(f"⏳ 正在計算相似度分組 (等級: {t})...")
@@ -201,9 +237,9 @@ def generate_tools(folder_path):
         groups_data[t] = groups
 
     with open(os.path.join(folder_path, "photo_cleaner.html"), "w", encoding="utf-8") as f:
-        f.write(get_html_content(json.dumps(valid_photos), json.dumps(groups_data)))
+        f.write(get_html_content(json.dumps(valid_photos), json.dumps(groups_data), total_files))
 
-    print(f"✅ 完成: photo_cleaner.html")
+    print(f"✅ 完成: photo_cleaner.html (總數: {total_files})")
 
 if __name__ == "__main__":
     generate_tools(".")
