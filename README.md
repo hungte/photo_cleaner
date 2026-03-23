@@ -1,4 +1,4 @@
-# photo_cleaner
+# Photo cleaner
 A set of tools to help cleaning photos
 
 我在幫小朋友製作相片書時，從 Google Takeout 下載了每年的相片，但發現要從中整理出相片書需要的照片很困難。
@@ -8,3 +8,15 @@ A set of tools to help cleaning photos
 
 為了方便整理，我需要一系列用 Python 作成的小工具。有些自己寫，有些叫 Gemini 幫忙。
 這個目錄就整合了我所使用的工具。
+
+## Requirements
+
+pip3 install numpy opencv-python pandas
+
+## Usage
+
+Move to the target folder and run the scripts in order:
+- Run `rename.py` to rename files by JSON.
+- Run `mov2jpg.py` to turn video files into jpeg files
+- Run `scan.py` to collect similarity and blur info.
+- Run `genweb.py` to generate a web page for selecting which files to delete.
