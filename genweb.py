@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-import csv
 import json
-import imagehash
+import os
 import urllib.parse
+import webbrowser
+
+import csv
+import imagehash
 
 def get_html_content(photos_json, groups_data_json, total_count):
     return f"""
@@ -236,10 +238,13 @@ def generate_tools(folder_path):
                 for item in group: processed.add(item['name'])
         groups_data[t] = groups
 
-    with open(os.path.join(folder_path, "photo_cleaner.html"), "w", encoding="utf-8") as f:
+    html_path = os.path.join(folder_path, "photo_cleaner.html")
+    with open(html_path, "w", encoding="utf-8") as f:
         f.write(get_html_content(json.dumps(valid_photos), json.dumps(groups_data), total_files))
 
     print(f"✅ 完成: photo_cleaner.html (總數: {total_files})")
+    url = 'file://' + os.path.realpath(html_path)
+    webbrowser.open_new_tab(url)
 
 if __name__ == "__main__":
     generate_tools(".")
