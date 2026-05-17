@@ -15,6 +15,13 @@ def get_html_content(photos_json, groups_data_json, total_count):
     <head>
         <meta charset="UTF-8">
         <title>照片清理助手</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+          <rect x='10' y='20' width='80' height='60' rx='8' fill='%234A90E2'/>
+          <path d='M20 70 L40 45 L55 60 L70 35 L85 70 Z' fill='%23FFFFFF' opacity='0.8'/>
+          <circle cx='70' cy='35' r='6' fill='%23FFD700'/>
+          <path d='M80 10 L82 18 L90 20 L82 22 L80 30 L78 22 L70 20 L78 18 Z' fill='%23FFD700'/>
+          <path d='M15 15 L17 21 L23 23 L17 25 L15 31 L13 25 L7 23 L13 21 Z' fill='%23FFD700' opacity='0.6'/>
+        </svg>">
         <style>
             body {{ font-family: -apple-system, sans-serif; background: #f5f5f7; padding: 20px; color: #1d1d1f; margin: 0; }}
             .nav {{ position: sticky; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
